@@ -1,14 +1,13 @@
-// Neo4jComponent.js
 import React, { useState } from 'react';
 import neo4j from 'neo4j-driver';
 
-const Neo4jComponent = () => {
+const Neo4jLicensingComponent = () => {
   const [songInput, setSongInput] = useState({
     title: '',
   });
 
   const [licensingInput, setLicensingInput] = useState({
-    companyName: '', // Adding company name as a primary key
+    companyName: '',
     wallet: '',
     licenseFee: 0,
     views: 0,
@@ -42,61 +41,41 @@ const Neo4jComponent = () => {
     const session = driver.session();
 
     try {
-      // Check if the song and licensing company already exist
+      // Check if the song already exists
       const existingSongQuery = `
         MATCH (song:Song {title: $songTitle})
         RETURN song
       `;
-      const existingLicensingCompanyQuery = `
-        MATCH (licensingCompany:LicensingCompany {companyName: $companyName})
-        RETURN licensingCompany
-      `;
+      const existingSongResult = await session.run(existingSongQuery, { songTitle: songInput.title });
 
-      const [existingSongResult, existingLicensingCompanyResult] = await Promise.all([
-        session.run(existingSongQuery, { songTitle: songInput.title }),
-        session.run(existingLicensingCompanyQuery, { companyName: licensingInput.companyName })
-      ]);
-
-      if (!existingSongResult.records.length || !existingLicensingCompanyResult.records.length) {
-        throw new Error('The specified song or licensing company does not exist.');
+      if (!existingSongResult.records.length) {
+        throw new Error('The specified song does not exist.');
       }
 
-      // Create the 'LicensedTo' relationship
       const createLicensedToRelationshipQuery = `
-        MATCH (song:Song {title: $songTitle}),
-              (licensingCompany:LicensingCompany {companyName: $companyName})
+        MATCH (song:Song {title: $songTitle})
         CREATE (song)-[:LicensedTo {
           accessFlag: $accessFlag,
           txnHash: $txnHash,
           aclToken: $aclToken
-        }]->(licensingCompany)
+        }]->(:LicensingCompany {
+          companyName: $companyName,
+          wallet: $licensingWallet,
+          licenseFee: $licenseFee,
+          views: $views,
+          deadline: $deadline
+        })
       `;
       await session.run(createLicensedToRelationshipQuery, {
         songTitle: songInput.title,
-        companyName: licensingInput.companyName,
         accessFlag: true, // Replace with actual boolean value
         txnHash: 'YourTxnHash', // Replace with actual string value
-        aclToken: 'YourACLToken' // Replace with actual string value
-      });
-
-      // Create the 'LicensedBy' relationship
-      const createLicensedByRelationshipQuery = `
-        MATCH (song:Song {title: $songTitle}),
-              (licensingCompany:LicensingCompany {companyName: $companyName})
-        CREATE (song)<-[:LicensedBy {
-          licensingWallet: $licensingWallet,
-          accessFlag: $accessFlag,
-          txnHash: $txnHash,
-          aclToken: $aclToken
-        }]-(licensingCompany)
-      `;
-      await session.run(createLicensedByRelationshipQuery, {
-        songTitle: songInput.title,
+        aclToken: 'YourACLToken', // Replace with actual string value
         companyName: licensingInput.companyName,
         licensingWallet: licensingInput.wallet,
-        accessFlag: true, // Replace with actual boolean value
-        txnHash: 'YourTxnHash', // Replace with actual string value
-        aclToken: 'YourACLToken' // Replace with actual string value
+        licenseFee: licensingInput.licenseFee,
+        views: licensingInput.views,
+        deadline: licensingInput.deadline
       });
 
       setSuccessMessage('Nodes and relationships created successfully');
@@ -150,4 +129,4 @@ const Neo4jComponent = () => {
   );
 };
 
-export default Neo4jComponent;
+export default Neo4jLicensingComponent;
